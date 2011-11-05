@@ -2,16 +2,21 @@
 Notas de integración de enviromux-mini en OMD
 *********************************************
 
+.. footer:: ###Page###
+.. contents::
+.. section-numbering::
+
 ENVIROMUX-MINI data
 ===================
 
-IP: 10.0.0.49 (static)
-MAC: 00:0C:82:01:16:71
-Web interface: Administrator/admin
-SNMP community: public
-SNMP Trap destination: undefined
+:IP: 10.0.0.49 (static)
+:MAC: 00:0C:82:01:16:71
+:Web interface: Administrator/admin
+:SNMP community: public
+:SNMP Trap destination: undefined
 
-Firmaware version: 1.41
+:Firmaware version: 1.41
+
 
 SNMP OIDs
 =========
@@ -242,5 +247,46 @@ O definiendo las variables adecuadas::
 
     In [39]: command = "snmpget -v1 -c %s %s %s" %(community, ip, oid)
     In [40]: temp = os.popen(command, "r").readline()
+
+
+check_mk checks
+===============
+
+Para los checks nativos de check_mk tenemos la duda inicial de si hacer todo en un mismo check. Después de examinar otros checks veo que no hay problema en hacerlo, excepto por el tema de los niveles de alerta.
+
+Si queremos que los chequéos sean simultáneos tenemos dos opciones:
+
+a. que los niveles de alerta estén hard-coded *malo*,  o bien
+
+b. utilizar los niveles de alerta definidos en el mismo enviromux a través del interface web.
+
+Esta última opción no estaría mal excepto por el hecho de que los niveles de alerta de temperatura se definen como a<t<c en enviromux, y nosotros queremos que para a<t tengamos warning y para t>c critical. Si podemos/queremos no utilizar las alertas propias de enviromux no habría problema.
+
+Si finalmente queremos poner unos parámetros por defecto o modificables desde check_mk entonces habría que separar los chequeos en varios, al menos en grupos de temperatura, humedad, agua y contactos. Luego ya podríamos diferenciar en ellos igual que hace ``df``, dando niveles distintos p.ej. según el disco.
+
+.. warning::
+        ¡Ojo tambíen al tema de los gráficos y las barra visual! Puede que también sea mucho mas sencillo con chequeos separados.
+
+
+multiples sensores snmp
+-----------------------
+
+Si queremos leer dos sensores por ejemplo hay que hacerlo (o al menos no veo otra forma por cómo es el mib) siguiendo el ejemplo del chequeo ``cisco_qos`` y haciendo de forma similar (lo de los OID_END no lo entiendo)::
+
+        snmp_info["enviromux_mini"] = \
+        [
+        #temperatureSensor1
+        ( ".1.3.6.1.4.1.3699.1.1.3",
+        [ "1.1.1", "1.1.2", "2.2.1", "2.2.2", "2.2.3", "2.2.4" ] ),
+        #temperatureSensor2
+        ( ".1.3.6.1.4.1.3699.1.1.3",
+        [ "1.2.1", "1.2.2", "2.3.1", "2.3.2", "2.3.3", "2.3.4" ] )
+        ]
+
+Ojo que esto devuelve una lista de listas de listas, no una lista de listas como en el ejmplo de la documentación::
+
+        OMD[cfm]:~/src$ cmk -I --checks enviromux_mini 10.0.0.49
+        [[['231', '0', 'Temperature #1', 'Celsius', '5.0', '38.0']],
+         [['655350', '0', 'Temperature #2', 'Celsius', '5.0', '38.0']]]
 
 
