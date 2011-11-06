@@ -65,6 +65,7 @@ If all sensors are queried simultaneously defaul values are used."""
 
     return args[0], options.community, options.sensor, options.warning, options.critical
 
+
 def temp1(community, ip):
     # Get temperature value
     oid  = BASE_OID+"1.1.1.0"
@@ -77,6 +78,20 @@ def temp1(community, ip):
     command = "snmpget -v1 -c %s %s %s" % (community, ip, oid)
     raw = os.popen(command, "r").readline()
     unit = temp.strip().split('"')[-2]
+
+
+    pass
+
+
+def vprint(level, message):
+    """Verbosity print.
+
+    Decide according to the given verbosity level if the message will be
+    printed to stdout.
+    """
+
+    if level <= verbosity:
+        print message
 
 
 if __name__ == "__main__":
