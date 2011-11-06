@@ -5,13 +5,21 @@ from optparse import OptionParser
 
 BASE_OID = ".1.3.6.1.4.1.3699.1.1.3"
 
+_verbosity = 0
+
 def ParseOptions():
     usage = "Usage: %prog host [options]"
     desc = """\
-Read sensor data from ENVIROMUX_MINI device through SNMP and gives back NAGIOS
-formatted check string. Warning and critical options apply to the queried sensor.
-If all sensors are queried simultaneously defaul values are used."""
+Reads sensor data from ENVIROMUX_MINI device through SNMP and gives back NAGIOS
+formatted check string. Optional Warning and Critical levels apply only to the queried sensor.
+If all sensors are queried simultaneously (-s all) global defaul values are used."""
     parser = OptionParser(usage, description=desc, version="%prog version 0.0")
+    parser.add_option("-v", "--verbosity",
+        type="int",
+        default=0,
+        metavar = "LEVEL",
+        help="set verbosity level to LEVEL; defaults to 0 (quiet), "
+             "possible values go up to 3")
     parser.add_option("-C", "--community",
         type="str",
         default="public",
@@ -23,15 +31,15 @@ If all sensors are queried simultaneously defaul values are used."""
         help='Sensor to query. Possible values: temp1 water all  [default: %default]')
     parser.add_option("-w", "--warning",
         type="float",
-        help="Warning levels for individually queried SENSOR "
+        help="Warning level for individually queried SENSOR "
              "[defaults: "
              "Temperature: 30, "
              "Humidity: 70%, "
-             "Water: no warning level (use same as critical), "
-             "dry contacts: no warning level (use same as critical)]")
+             "Water: None (if neccesary, use same as critical), "
+             "dry contacts: None (if neccesary, use same as critical)]")
     parser.add_option("-c", "--critical",
         type="float",
-        help="Critical levels for individually queried SENSOR "
+        help="Critical level for individually queried SENSOR "
              "[defaults: "
              "Temperature: 38C, "
              "Humidity: 80%, "
@@ -63,7 +71,8 @@ If all sensors are queried simultaneously defaul values are used."""
     if len(args) != 1:
         parser.error("Please give enviromux-mini device ip or hostname.")
 
-    return args[0], options.community, options.sensor, options.warning, options.critical
+    return args[0], options.verbosity, options.community, options.sensor, \
+            options.warning, options.critical
 
 
 def temp1(community, ip):
@@ -85,24 +94,27 @@ def temp1(community, ip):
 
 def vprint(level, message):
     """Verbosity print.
-
     Decide according to the given verbosity level if the message will be
     printed to stdout.
     """
-
     if level <= verbosity:
         print message
 
 
 if __name__ == "__main__":
     #  default warning/critical levels: temp_w, temp_c, hum_w, hum_c, water, dry_contacts[1-4]
-    # BEWARE!! Due to limitations in optparse module these vaules are hard coded
-    # into optparse help strings. If you change some value here be sure to reflect
-    # the new default value int the help there.
+    # BEWARE!! Due to limitations in optparse module these values are hard coded
+    # into the optparse help strings. If you change some value here be sure to reflect
+    # the change in the help string accordingly.
     levels = [30., 38., 70., 80., 1, 0, 0, 0, 0]
-    ip, comm, sensor, warn, crit = ParseOptions()
-    print "ip, comm, sensor, warn, crit"
-    print ip, comm, sensor, warn, crit
+    ip, verbosity, comm, sensor, warn, crit = ParseOptions()
+    print "ip, verbosity, comm, sensorv, comm, sensor, warn, crit"
+    print ip, verbosity, comm, sensor, warn, crit
+    print "verbos:", verbosity
+    vprint(1,"hola 1")
+    vprint(2,"hola 2")
+    vprint(3,"hola 3")
+
     sys.exit(1)
     
 
