@@ -5,11 +5,11 @@ from optparse import OptionParser
 import logging
 import StringIO
 
-BASE_OID = ".1.3.6.1.4.1.3699.1.1.3"
+BASE_OID = ".1.3.6.1.4.1.3699.1.1.3."
 
 _verbosity = 0
 
-def ParseOptions():
+def ParseOptions(default_levels):
     usage = "Usage: %prog host [options]"
     desc = """\
 Reads sensor data from ENVIROMUX_MINI device through SNMP and gives back NAGIOS
@@ -54,12 +54,12 @@ values are used."""
 
     (options, args) = parser.parse_args()
 
-
+    # Check for command line human errors
     if options.sensor == "all" and (options.warning or options.critical):
         parser.error("Critical and warning specific values can only be requested"
                      "for individually queried sensors. When querying all sensors"
                      "simultaneously defaults are used.")
-
+    
     contact_sensors = ["contact1", "contact2", "contact3", "contact4","water"]
     continous_sensors = ["temperature1", "temperature2", "humidity1", "humidity2"]
     if options.sensor in contact_sensors:
@@ -82,14 +82,47 @@ values are used."""
     else:
         parser.error("Something went wrong with the sensor type. Please report bug.")
 
+    # Check for only one argument
     if len(args) == 0:
         parser.error("Please give enviromux-mini device ip or hostname.")
     elif len(args) > 1:
         parser.error("Please give only enviromux-mini device ip or hostname.")
 
+    # Check and set warning final values
+    sensor = options.sensor
+    if not options.warning:
+        if "temperature" in sensor:
+            warning = default_levels[0]
+        elif "humidity" in sensor:
+            warning = default_levels[2]
+        elif "contact" in sensor:
+            warning = default_levels[5]
+        elif "water" in sensor:
+            warning = default_levels[4]
+        else: # we never should get here
+            parser.error("Something went wrong when checking default warning level."
+                        "Please report bug.")
+    else:
+        warning = options.warning
+
+    # Check and set critical final values
+    if not options.critical:
+        if "temperature" in sensor:
+            critical = default_levels[1]
+        elif "humidity" in sensor:
+            critical = default_levels[3]
+        elif "contact" in sensor:
+            critical = default_levels[5]
+        elif "water" in sensor:
+            critical = default_levels[4]
+        else: # we never should get here
+            parser.error("Something went wrong when checking default critical level."
+                        "Please report bug.")
+    else:
+        critical = options.critical
 
     return args[0], options.verbosity, options.community, options.sensor, \
-            sensor_type, options.warning, options.critical
+            sensor_type, warning, critical
 
 
 def temp1(community, ip):
@@ -121,12 +154,12 @@ def vprint(level, *args):
 
 
 if __name__ == "__main__":
-    #  default warning/critical levels: temp_w, temp_c, hum_w, hum_c, water, dry_contacts[1-4]
+    #  default warning/critical levels: temp_w, temp_c, hum_w, hum_c, water, dry_contacts
     # BEWARE!! Due to limitations in optparse module these values are hard coded
     # into the optparse help strings. If you change some value here be sure to reflect
     # the change in the help string accordingly.
-    wc_levels = [30., 38., 70., 80., 1, 0, 0, 0, 0]
-    ip, verbosity, comm, sensor, sensor_type, warn, crit = ParseOptions()
+    levels = [30., 38., 70., 80., 1, 0]
+    host, verbosity, community, sensor, sensor_type, warning, critical = ParseOptions(levels)
 
     # Feedback about verbosity level if specified.
     if verbosity == 1:
@@ -135,18 +168,36 @@ if __name__ == "__main__":
         vprint(2,"Verbosity Level 2")
     elif verbosity == 3:
         vprint(3,"Verbosity Level 3 - Debug")
-    
+
     # use a StringIO object to easily "print" to strings to pass them to vprint.
     vprint (3, "Parameters:")
-    vprint (3,  "host:", ip, 
+    vprint (3,  "host:", host,
             "\nverbosity: ",verbosity,
-            "\ncommunity: ",comm,
+            "\ncommunity: ",community,
             "\nsensor: ",sensor,
-            "\nwarning level", warn,
-            "\ncritical level: ",crit)
+            "\nwarning level", warning,
+            "\ncritical level: ",critical)
     vprint (3, "Sensor type: ", sensor_type)
 
-    # OID for all sensors
+    # OID for all sensors [CurrentValue, Name], temperature also has units
+    #"temperature1", "temperature2", "humidity1", "humidity2", "contact1", "contact2", "contact3", "contact4","water", "all"
+    temperature1 = ["1.1.1", "2.2.1", "2.2.2"]
+    temperature2 = ["1.2.1", "2.3.1", "2.3.2"]
+    humidity1    = ["1.3.1", "2.4.1"]
+    humidity2    = ["1.4.1", "2.5.1"]
+    contact1     = ["1.5.1", "2.6.1"]
+    contact2     = ["1.6.1", "2.7.1"]
+    contact3     = ["1.7.1", "2.8.1"]
+    contact4     = ["1.8.1", "2.9.1"]
+    water        = ["1.9.1", "2.10.1"]
+
+    #get sensor value
+    oid = BASE_OID + vars()[sensor][0]+".0"
+    command =  "snmpget -v1 -c %s %s %s" %(community, host, oid)
+    snmp_out = os.popen(command, "r").readline()
+
+    vprint (3, snmp_out)
+
 
     sys.exit(1)
 
