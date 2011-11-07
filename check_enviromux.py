@@ -2,20 +2,16 @@
 
 import sys, os
 from optparse import OptionParser
-import logging
-import StringIO
 
-BASE_OID = ".1.3.6.1.4.1.3699.1.1.3."
-
-_verbosity = 0
+verbosity = 0
 
 def ParseOptions(default_levels):
     usage = "Usage: %prog host [options]"
-    desc = """\
-Reads sensor data from ENVIROMUX_MINI device through SNMP and gives back NAGIOS
-formatted check string. Optional Warning and Critical levels apply only to the
-queried sensor. If all sensors are queried simultaneously (-s all) global defaul
-values are used."""
+    desc = "Reads sensor data from ENVIROMUX_MINI device through SNMP and \
+gives back NAGIOS formatted check string. Optional Warning and Critical \
+levels apply only to the queried sensor. If all sensors are queried \
+simultaneously (-s all) global defaul values are used."
+
     parser = OptionParser(usage, description=desc, version="%prog version 0.0")
     parser.add_option("-v", "--verbosity",
         type="int",
@@ -125,25 +121,8 @@ values are used."""
             sensor_type, warning, critical
 
 
-def temp1(community, ip):
-    # Get temperature value
-    oid  = BASE_OID+"1.1.1.0"
-    command = "snmpget -v1 -c %s %s %s" % (community, ip, oid)
-    raw = os.popen(command, "r").readline()
-    temp = "%2.1" %(float(temp.strip().split()[-1]/10.));
-
-    # get temperature units
-    oid = BASE_OID+"2.2.2.0"
-    command = "snmpget -v1 -c %s %s %s" % (community, ip, oid)
-    raw = os.popen(command, "r").readline()
-    unit = temp.strip().split('"')[-2]
-
-
-    pass
-
-
 def vprint(level, *args):
-    """Verbosit y print.
+    """Verbosity print.
     Decide according to the given verbosity level if the message will be
     printed to stdout.
     """
@@ -152,16 +131,7 @@ def vprint(level, *args):
             print arg,
         print
 
-
-if __name__ == "__main__":
-    #  default warning/critical levels: temp_w, temp_c, hum_w, hum_c, water, dry_contacts
-    # BEWARE!! Due to limitations in optparse module these values are hard coded
-    # into the optparse help strings. If you change some value here be sure to reflect
-    # the change in the help string accordingly.
-    levels = [30., 38., 70., 80., 1, 0]
-    host, verbosity, community, sensor, sensor_type, warning, critical = ParseOptions(levels)
-
-    # Feedback about verbosity level if specified.
+def verbosity_feedback():
     if verbosity == 1:
         vprint(1,"Verbosity Level 1")
     elif verbosity == 2:
@@ -169,7 +139,29 @@ if __name__ == "__main__":
     elif verbosity == 3:
         vprint(3,"Verbosity Level 3 - Debug")
 
-    # use a StringIO object to easily "print" to strings to pass them to vprint.
+
+def main():
+    global verbosity
+    BASE_OID = ".1.3.6.1.4.1.3699.1.1.3."
+    nagios_codes = dict(OK=0, WARNING=1, CRITICAL=2, UNKNOWN=3)
+
+    #  default warning/critical levels: temp_w, temp_c, hum_w, hum_c, water, dry_contacts
+    # BEWARE!! Due to limitations in optparse module these values are hard coded
+    # into the optparse help strings. If you change some value here be sure to reflect
+    # the change in the help string accordingly.
+    levels = [30., 38., 70., 80., 1, 0]
+
+    # return variables
+    code = 0
+    message = ""
+
+    # get command line parameters
+    host, verbosity, community, sensor, sensor_type, warning, critical = ParseOptions(levels)
+
+    # Feedback about verbosity level if specified.
+    verbosity_feedback()
+
+    # Parameters check
     vprint (3, "Parameters:")
     vprint (3,  "host:", host,
             "\nverbosity: ",verbosity,
@@ -180,7 +172,8 @@ if __name__ == "__main__":
     vprint (3, "Sensor type: ", sensor_type)
 
     # OID for all sensors [CurrentValue, Name], temperature also has units
-    #"temperature1", "temperature2", "humidity1", "humidity2", "contact1", "contact2", "contact3", "contact4","water", "all"
+    sensors = ["temperature1", "temperature2", "humidity1", "humidity2", \
+               "contact1", "contact2", "contact3", "contact4","water"]
     temperature1 = ["1.1.1", "2.2.1", "2.2.2"]
     temperature2 = ["1.2.1", "2.3.1", "2.3.2"]
     humidity1    = ["1.3.1", "2.4.1"]
@@ -191,13 +184,45 @@ if __name__ == "__main__":
     contact4     = ["1.8.1", "2.9.1"]
     water        = ["1.9.1", "2.10.1"]
 
+    #get sensor name
+    oid = BASE_OID + vars()[sensor][1]+".0"
+    command =  "snmpget -v1 -c %s %s %s" %(community, host, oid)
+    snmp_out = os.popen(command, "r").readline()
+    sensor_name = snmp_out.strip().split('"')[-2]
+    vprint (3, "sensor name snmp output: ", snmp_out)
+    vprint (3, "sensor name in device: ", sensor_name)
+
     #get sensor value
     oid = BASE_OID + vars()[sensor][0]+".0"
     command =  "snmpget -v1 -c %s %s %s" %(community, host, oid)
     snmp_out = os.popen(command, "r").readline()
+    value_str = snmp_out.strip().split()[-1]
+    vprint (3, "sensor value snmp output: ", snmp_out)
+    vprint (3, "sensor value:", value_str)
 
-    vprint (3, snmp_out)
+    # get/set units and other temperature specific sets
+    if sensor == "temperature1":
+        oid = BASE_OID + vars()[sensor][2]+".0"
+        command =  "snmpget -v1 -c %s %s %s" %(community, host, oid)
+        snmp_out = os.popen(command, "r").readline()
+        unit_str = snmp_out.strip().split('"')[-2]
+        vprint (3, "sensor units snmp output: ", snmp_out)
+        vprint (3, "sensor units:", unit_str)
+
+        # correct temperature value
+        value_str = "%2.1f" %(float(value_str)/10.)
+        vprint (3, "Corrected temperature sensor value:", value_str)
+
+    # check thresohlds depending on the type of sensor
+    if sensor_type == "continous":
+
+
+
 
 
     sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
 
