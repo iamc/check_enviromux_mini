@@ -95,9 +95,8 @@ simultaneously (-s all) global defaul values are used."
             warning = default_levels[5]
         elif "water" in sensor:
             warning = default_levels[4]
-        else: # we never should get here
-            parser.error("Something went wrong when checking default warning level."
-                        "Please report bug.")
+        else:  # leave None if sensor all
+            warning = options.warning
     else:
         warning = options.warning
 
@@ -111,9 +110,8 @@ simultaneously (-s all) global defaul values are used."
             critical = default_levels[5]
         elif "water" in sensor:
             critical = default_levels[4]
-        else: # we never should get here
-            parser.error("Something went wrong when checking default critical level."
-                        "Please report bug.")
+        else: # leave None if sensor all
+            critical = options.critical
     else:
         critical = options.critical
 
@@ -130,6 +128,7 @@ def vprint(level, *args):
         for arg in args:
             print arg,
         print
+
 
 def verbosity_feedback():
     if verbosity == 1:
@@ -152,7 +151,7 @@ def main():
     levels = [30., 38., 70., 80., 1, 0]
 
     # return variables
-    code = 0
+    status = ""
     message = ""
 
     # get command line parameters
@@ -172,8 +171,6 @@ def main():
     vprint (3, "Sensor type: ", sensor_type)
 
     # OID for all sensors [CurrentValue, Name], temperature also has units
-    sensors = ["temperature1", "temperature2", "humidity1", "humidity2", \
-               "contact1", "contact2", "contact3", "contact4","water"]
     temperature1 = ["1.1.1", "2.2.1", "2.2.2"]
     temperature2 = ["1.2.1", "2.3.1", "2.3.2"]
     humidity1    = ["1.3.1", "2.4.1"]
@@ -183,6 +180,13 @@ def main():
     contact3     = ["1.7.1", "2.8.1"]
     contact4     = ["1.8.1", "2.9.1"]
     water        = ["1.9.1", "2.10.1"]
+
+    if sensor == "all":
+        sensors = ["temperature1", "temperature2", "humidity1", "humidity2", \
+               "contact1", "contact2", "contact3", "contact4","water"]
+
+    # TODO: loop over sensors (be one or all) and take care of global output
+    # code.
 
     #get sensor name
     oid = BASE_OID + vars()[sensor][1]+".0"
@@ -201,26 +205,66 @@ def main():
     vprint (3, "sensor value:", value_str)
 
     # get/set units and other temperature specific sets
-    if sensor == "temperature1":
+    if "temperature" in sensor:
         oid = BASE_OID + vars()[sensor][2]+".0"
         command =  "snmpget -v1 -c %s %s %s" %(community, host, oid)
         snmp_out = os.popen(command, "r").readline()
-        unit_str = snmp_out.strip().split('"')[-2]
+        unit = snmp_out.strip().split('"')[-2]
         vprint (3, "sensor units snmp output: ", snmp_out)
-        vprint (3, "sensor units:", unit_str)
-
+        vprint (3, "sensor units:", unit)
         # correct temperature value
         value_str = "%2.1f" %(float(value_str)/10.)
         vprint (3, "Corrected temperature sensor value:", value_str)
+    elif "humidity" in  sensor:
+        unit = "%"
+        # correct humidty value
+        value_str = "%2.1f" %(float(value_str)/10.)
+        vprint (3, "Corrected humidty sensor value:", value_str)
+    else:
+        unit = ""
+
+    # set performance data limits
+    if "temperature" in sensor:
+        min = "0."
+        max = "40."
+    elif "humedity" in sensor:
+        min = "20."
+        max = "80."
+    else:
+        min = "0"
+        max = "1"
 
     # check thresohlds depending on the type of sensor
     if sensor_type == "continous":
+        value = float(value_str)
+        warn = float(warning)
+        crit = float(critical)
+        if value <= warn:
+            status = "OK"
+        elif warn < value < crit:
+            status = "WARNING"
+        elif value >= crit:
+            status = "CRITICAL"
+        else:
+            status = "UNKNOWN"
+    else:
+        value = int(value_str)
+        warn = int(warning)
+        crit = int(critical)
+        if value == crit:
+            status = "CRITICAL"
+        else:
+            status = "OK"
 
+    message = "%s - %s sensor reading is %s%s | %s=%s%s;%s;%s;%s;%s"\
+            %(status, sensor_name, value_str, unit,
+              sensor_name, value_str, unit, warning, critical, min, max)
 
+    vprint (3, "Output message:\n", message)
+    vprint (3, "Return code: ", nagios_codes[status])
 
-
-
-    sys.exit(1)
+    print message
+    sys.exit(nagios_codes[status])
 
 
 if __name__ == "__main__":
