@@ -30,8 +30,11 @@ values are used."""
     parser.add_option("-s", "--sensor",
         type="choice",
         default="all",
-        choices=["temp1","water","all"],
-        help='Sensor to query. Possible values: temp1 water all  [default: %default]')
+        choices = ["temperature1", "temperature2", "humidity1", "humidity2",
+        "contact1", "contact2", "contact3", "contact4","water", "all"],
+        help="Sensor to query. Possible values: temperature1 "
+             "temperature2 humidity1 humidity2 contact1 contact2 "
+             "contact3 contact4 water all [default: %default]")
     parser.add_option("-w", "--warning",
         type="float",
         help="Warning level for individually queried SENSOR "
@@ -57,8 +60,8 @@ values are used."""
                      "for individually queried sensors. When querying all sensors"
                      "simultaneously defaults are used.")
 
-    contact_sensors = ["water"]
-    continous_sensors = ["temp"]
+    contact_sensors = ["contact1", "contact2", "contact3", "contact4","water"]
+    continous_sensors = ["temperature1", "temperature2", "humidity1", "humidity2"]
     if options.sensor in contact_sensors:
         sensor_type = "contact"
         if options.warning and options.warning not in [0,1]:
