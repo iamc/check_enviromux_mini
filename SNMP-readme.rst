@@ -249,6 +249,48 @@ O definiendo las variables adecuadas::
     In [40]: temp = os.popen(command, "r").readline()
 
 
+Tras un cierto curro ya tenemos el script ``check_enviromux.py`` que nos genera la salida adecuada (ver la ayuda ``-h``)::
+
+    inigo:ENVIROMUX-MINI> ./check_enviromux.py 10.0.0.49 -s temperature1 -w 35 -c 40
+    OK - Temperature #1 sensor reading is 22.6 Celsius|Temperature_#1=22.6;35.0;40.0;0.;45.
+    inigo:ENVIROMUX-MINI> ./check_enviromux.py 10.0.0.49 -s humidity1 -w40 -c 70
+    WARNING - Humidity #1 sensor reading is 42.0 %|Humidity_#1=42.0%;40.0;70.0;20.;85.
+    inigo:ENVIROMUX-MINI> ./check_enviromux.py 10.0.0.49 -s water
+    OK - No water detected
+    inigo:ENVIROMUX-MINI> ./check_enviromux.py 10.0.0.49 -s contact1
+    CRITICAL - Dry Contact #1: contact is CLOSED!
+
+
+Configuración de Nagios
+-----------------------
+
+Por un lado tendremos la configuración del host y servicios en nagios y por otro la configuración de la graficación de los datos en pnp4nagios.
+
+La primera la hacemos directamente en un archivo ``enviromux.cfg``
+
+La segunda es mas complicada y la detallamos a continuación.
+
+
+PNP4Nagios
+~~~~~~~~~~
+
+Veamos el ejemplo de la temperatura. El chequeo lo hemos definido como::
+
+    define service{
+    	use 			generic-service
+    	host_name 		Enviromux-TEST
+    	service_description 	Temperature #1
+    	check_command 		check_enviromux!public!temperature1!30!38
+
+Cada vez que Nagios ejecuta un comando (en este caso ``check_enviromux``) busca el template correspondiente con el nombre ``check_enviromux.php`` en este caso. Si no lo encuentra usa por defecto el template ``default.php``. Los templates se encuentran en ``share/templates.dist`` los incluidos con PNP4Nagios y en ``share/templates`` los creados por nosotros y que no se deben actualizar al actualizar PNP4Nagios.
+
+El problema en este caso es que tenemos varios checks que utilizan el mismo comando, ``check_enviromux``. Lo que se hace en estos casos es un custom template. Para ello en el archivo de configuración ``etc/check_commands/check_enviromux.cfg`` se le dice que en caso en que llame al comando, debe utilizar para buscar el template por ejempl el segundo argumento de la llamada (en este caso buscaría pues el template ``temperature1.php``, pero se pueden hacer combinaciones tipo ``check_enviromux_template1.php`` y cosas así). Esto está muy bien explicado en `este blog`_ y en la documentación oficial de PNP4Nagios, en la sección de `custom templates`_.
+
+.. _`este blog`: http://askaralikhan.blogspot.com/2010/01/creating-custom-template-in-pnp4nagios.html
+.. _`custom templates`: http://docs.pnp4nagios.org/pnp-0.6/tpl_custom
+
+En realidad lo que busca PNP4Nagios al ejecutar un comando que devuelve perfdata es un fichero ``perfdata/hostname/check_name.xml``. Este fichero lo genera parece que nagio automáticamente y en el está indicado qué template php debe utilizar en la sección ``<TEMPLATE> ... </TEMPLATE>``. En él podemos comprobar que el tema esté bien configurado. En el caso de *OMD* estos ficheros están en ``~/var/pnp4nagios/perfdata``. **Los datos rdd** también se encuentran en esa ruta.
+
 check_mk checks
 ===============
 
