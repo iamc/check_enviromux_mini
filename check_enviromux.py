@@ -7,12 +7,14 @@ from optparse import OptionParser
 verbosity = 0
 
 
-def parseOptions(default_levels):
+def parse_options(default_levels):
+    """ Get command line options and do some checks over them."""
     usage = "Usage: %prog host [options]"
-    desc = "Reads sensor data from ENVIROMUX_MINI device through SNMP and \
-gives back NAGIOS formatted check string. Optional Warning and Critical \
-levels apply only to the queried sensor. If all sensors are queried \
-simultaneously (-s all) global defaul values are used."
+    desc = ("Reads sensor data from ENVIROMUX_MINI device through SNMP and "
+            "gives back NAGIOS formatted check string. Optional Warning and "
+            "Critical levels apply only to the queried sensor. If all "
+            "sensors are queried simultaneously (-s all) global defaul "
+            "values are used.")
 
     parser = OptionParser(usage, description=desc, version="%prog version 0.0")
     parser.add_option("-v", "--verbosity",
@@ -52,21 +54,33 @@ simultaneously (-s all) global defaul values are used."
 
     (options, args) = parser.parse_args()
 
-    # Check for command line human errors
-    if options.sensor == "all" and (options.warning or options.critical):
+    sensor_type, warning, critical = check_options(options, args,
+                                                   default_levels, parser)
+    return args[0], options.verbosity, options.community, options.sensor, \
+            sensor_type, warning, critical
+
+
+def check_options(options, args, default_levels, parser):
+    """Check for command line human errors and do some parsing."""
+    # group sensor by type
+    contact_sensors = ["contact1", "contact2", "contact3", "contact4", "water"]
+    continous_sensors = ["temperature1", "temperature2", "humidity1", "humidity2"]
+
+    # no options for all sensors
+    if options.sensor == "all" and (options.warning != None or 
+                                    options.critical != None):
         parser.error("Critical and warning specific values can only be requested"
                      "for individually queried sensors. When querying all sensors"
                      "simultaneously, default values are used.")
 
-    contact_sensors = ["contact1", "contact2", "contact3", "contact4", "water"]
-    continous_sensors = ["temperature1", "temperature2", "humidity1", "humidity2"]
+    # clasify sensor and check for contact sensors correct w/c options
     if options.sensor in contact_sensors:
         sensor_type = "contact"
-        if options.warning and options.warning not in [0, 1]:
-            parser.error("For contact type sensors warning/critical should be"
+        if options.warning != None and options.warning not in [0, 1]:
+            parser.error("For contact type sensors warning/critical should be "
                          "0 (open contact) or 1 (closed contact).")
-        if options.critical and options.critical not in [0, 1]:
-            parser.error("For contact type sensors warning/critical should be"
+        if options.critical != None and options.critical not in [0, 1]:
+            parser.error("For contact type sensors warning/critical should be "
                          "0 (open contact) or 1 (closed contact).")
         if options.warning != None  and \
            options.critical != None and \
@@ -117,8 +131,12 @@ simultaneously (-s all) global defaul values are used."
     else:
         critical = options.critical
 
-    return args[0], options.verbosity, options.community, options.sensor, \
-            sensor_type, warning, critical
+    # check warning < critical
+    if sensor_type == "continous":
+        if warning >= critical:
+            parser.error("Warning level should be < than critical level.")
+
+    return sensor_type, warning, critical
 
 
 def vprint(level, *args):
@@ -142,39 +160,9 @@ def verbosity_feedback():
         vprint(3, "Verbosity Level 3 - Debug")
 
 
-def main():
-    global verbosity
+def read_sensor(host, community, sensor):
+    """ Retrieve sensor data from enviromux-mini device.  """
     base_oid = ".1.3.6.1.4.1.3699.1.1.3."
-    nagios_codes = dict(OK=0, WARNING=1, CRITICAL=2, UNKNOWN=3)
-    contact_status = ["open", "closed"]
-    water_status = ["No water detected", "water detected"]
-
-    #  default warning/critical levels: temp_w, temp_c, hum_w, hum_c, water, dry_contacts
-    # BEWARE!! Due to limitations in optparse module these values are hard coded
-    # into the optparse help strings. If you change some value here be sure to reflect
-    # the change in the help string accordingly.
-    levels = [30., 38., 70., 80., 1, 0]
-
-    # return variables
-    status = ""
-    message = ""
-
-    # get command line parameters
-    host, verbosity, community, sensor, sensor_type, warning, critical = parseOptions(levels)
-
-    # Feedback about verbosity level if specified.
-    verbosity_feedback()
-
-    # Parameters check
-    vprint(3, "Parameters:")
-    vprint(3,  "host:", host,
-            "\nverbosity: ", verbosity,
-            "\ncommunity: ", community,
-            "\nsensor: ", sensor,
-            "\nwarning level", warning,
-            "\ncritical level: ", critical)
-    vprint(3, "Sensor type: ", sensor_type)
-
     # OID for all sensors [CurrentValue, Name], temperature also has units
     temperature1 = ["1.1.1", "2.2.1", "2.2.2"]
     temperature2 = ["1.2.1", "2.3.1", "2.3.2"]
@@ -228,6 +216,16 @@ def main():
     else:
         unit = ""
 
+    return sensor_name, value_str, unit
+
+    
+def generate_output(sensor, sensor_name, sensor_type, value_str, unit, 
+                    warning, critical):
+    """Generate nagios ouput from sensor data and limits."""
+    # define status for contact sersors.
+    contact_status = ["open", "closed"]
+    water_status = ["No water detected", "water detected"]
+
     # set performance data limits
     if "temperature" in sensor:
         sensor_min = "0."
@@ -239,7 +237,7 @@ def main():
         sensor_min = "0"
         sensor_max = "1"
 
-    # check thresohlds depending on the type of sensor
+    # check thresholds depending on the type of sensor
     if sensor_type == "continous":
         value = float(value_str)
         warn = float(warning)
@@ -252,15 +250,17 @@ def main():
             status = "CRITICAL"
         else:
             status = "UNKNOWN"
-        output = "%s - %s sensor reading is %s%s "\
+        output = "%s - %s sensor reading is %s %s"\
             % (status, sensor_name, value_str, unit)
-        perfdata = "| %s=%s%s;%s;%s;%s;%s" \
-            % (sensor_name, value_str, unit, warning, critical, sensor_min, sensor_max)
+        if "temperature" in sensor:
+            unit = ""  # do not add Celsius to perfdata
+        perfdata = ("|%s=%s%s;%s;%s;%s;%s" %
+                    (sensor_name.replace(" ", "_"), value_str, unit, warning,
+                     critical, sensor_min, sensor_max))
     else:
         value = int(value_str)
         warn = int(warning)
         crit = int(critical)
-        perfdata = ""
         if "water" in sensor:
             if value == crit:
                 status = "CRITICAL"
@@ -277,6 +277,53 @@ def main():
                 status = "OK"
                 output = "OK - %s: contact is %s!" % (sensor_name,
                                   contact_status[value])
+        perfdata = ""
+
+    return status, output, perfdata
+
+
+def main():
+    """Main check code.
+
+    We define some general variables here as default warning/critical
+    levels.
+
+    """
+    global verbosity
+    nagios_codes = dict(OK=0, WARNING=1, CRITICAL=2, UNKNOWN=3)
+
+    #  default warning/critical levels: temp_w, temp_c, hum_w, hum_c, water, dry_contacts
+    # BEWARE!! Due to limitations in optparse module these values are hard coded
+    # into the optparse help strings. If you change some value here be sure to reflect
+    # the change in the help string accordingly.
+    levels = [30., 38., 70., 80., 1, 0]
+
+    # return variables
+    status = ""
+    message = ""
+
+    # get command line parameters
+    host, verbosity, community, sensor, sensor_type, warning, critical = \
+        parse_options(levels)
+
+    # Feedback about verbosity level if specified
+    verbosity_feedback()
+
+    # Parameters check
+    vprint(3, "Parameters:")
+    vprint(3,  "host:", host,
+            "\nverbosity: ", verbosity,
+            "\ncommunity: ", community,
+            "\nsensor: ", sensor,
+            "\nwarning level", warning,
+            "\ncritical level: ", critical)
+    vprint(3, "Sensor type: ", sensor_type)
+
+    # read sensor data and other values
+    sensor_name, value_str, unit = read_sensor(host, community, sensor)
+
+    status, output, perfdata = generate_output(sensor, sensor_name,
+                        sensor_type, value_str, unit, warning, critical)
 
     message = output + perfdata
 
