@@ -37,22 +37,28 @@ def parse_options(default_levels):
              "contact3 contact4 water all [default: %default]")
     parser.add_option("-w", "--warning",
         type="float",
-        help="Warning level for individually queried SENSOR "
-             "[defaults: "
-             "Temperature: 30, "
-             "Humidity: 70%, "
-             "Water: None (if neccesary, use same as critical), "
-             "dry contacts: None (if neccesary, use same as critical)]")
+        help="Warning level for individually queried SENSOR. Dry contacts "
+             "and water sensor only use critical levels. See -d option "
+             "for defaults.")
     parser.add_option("-c", "--critical",
         type="float",
-        help="Critical level for individually queried SENSOR "
-             "[defaults: "
-             "Temperature: 38C, "
-             "Humidity: 80%, "
-             "Water: 1 (water detected), "
-             "dry contacts: 0 (open contact)]")
+        help="Critical level for individually queried SENSOR. For water "
+             "sensor levels are 0/1 (no water/water detected) and for contact "
+             "sensors levels are 0/1 (open/closed contact). See -d option "
+             "for defaults.")
+    parser.add_option("-d", "--defaults",
+        action="store_true",
+        dest="show_defaults",
+        default=False,
+        help="Show default warning/critical threshold values for all "
+             "sensors and exit.")
+
 
     (options, args) = parser.parse_args()
+
+    if options.show_defaults == True:
+        show_defaults(default_levels)
+        sys.exit(1)
 
     check_options(options, args, parser)
 
@@ -168,6 +174,24 @@ def default_critical(sensor, default_levels):
     return critical
 
 
+def show_defaults(default_levels):
+    """Print default warning critical levels for all sensors."""
+    sensors = ["temperature1", "temperature2", "humidity1", "humidity2", \
+               "contact1", "contact2", "contact3", "contact4", "water"]
+
+    print "Default Warning/Critical levels for all sensors."
+    print ""
+    print "For Dry Contacts and Water sensor only critical levels are used:"
+    print "    water: 0 = no water detected, 1 = water detected"
+    print "    contacts: 0 = contact open, 1 = contact closed"
+    print ""
+    print "Sensor  Warning  Critical"
+    print "-------------------------"
+    for sensor in sensors:
+        print sensor, default_warning(sensor, default_levels), \
+                default_critical(sensor, default_levels)
+
+
 def vprint(level, *args):
     """Verbosity print.
     Decide according to the given verbosity level if the message will be
@@ -190,7 +214,7 @@ def verbosity_feedback():
 
 
 def read_sensor(host, community, sensor):
-    """ Retrieve sensor data from enviromux-mini device.  """
+    """Retrieve sensor data from enviromux-mini device."""
     base_oid = ".1.3.6.1.4.1.3699.1.1.3."
     # OID for all sensors [CurrentValue, Name , Units(if available)]
     temperature1 = ["1.1.1", "2.2.1", "2.2.2"]
@@ -358,9 +382,6 @@ def main():
     else:
         all_sensors = False
         sensors = [sensor]
-
-    # TODO: loop over sensors (be one or all) and take care of global output
-    # code.
 
     for sensor in sensors:
         vprint(3, "-----------------------------")
