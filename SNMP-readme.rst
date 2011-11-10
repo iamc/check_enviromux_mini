@@ -271,10 +271,69 @@ La primera la hacemos directamente en un archivo ``enviromux.cfg``
 La segunda es mas complicada y la detallamos a continuación.
 
 
+Configuración host y servicios
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Realizamos toda la configuración en un único archivo a colocar en
+``~/etc/nagios/conf.d/inigo/``. Aunque no lo sea usaremos la plantilla
+de ``linux-server`` para el host y de  ``generic-service`` para el servicio.
+
+``enviromux.cfg``::
+
+    ;Enviromux-1 in CPD-1 
+    define host{
+        ;use 		generic-host
+        use 		linux-server
+        host-alias 	Enviromux-TEST
+        alias 		Enviromux-TEST-1 CPD-1
+        address 	10.0.0.49
+    }
+
+    define command{
+        command_name 	check_enviromux
+        command_line 	$USER1$/check_enviromux $HOSTADDRESS$ -C $ARG1$ -s $ARG2$ -w $ARG3$ -c $ARG4$
+    }
+
+    define service{
+        use 			generic-service
+        host_name 		Enviromux-TEST
+        service_description 	Temperature #1
+        check_command 		check_enviromux!public!temperature1!30!38
+    }
+
+    define service{
+        use 			generic-service
+        host_name 		Enviromux-TEST
+        service_description 	Humidity #1
+        check_command 		check_enviromux!public!humidity1!70!80
+    }
+
+    define service{
+        use 			generic-service
+        host_name 		Enviromux-TEST
+        service_description 	Water Sensor
+        check_command 		check_enviromux!public!water!1!1
+    }
+
+    define service{
+        use 			generic-service
+        host_name 		Enviromux-TEST
+        service_description 	Contact #1
+        check_command 		check_enviromux!public!contact1!1!1
+    }
+
+    define service{
+        use 			generic-service
+        host_name 		Enviromux-TEST
+        service_description 	Contact #2
+        check_command 		check_enviromux!public!contact2!1!1
+    }
+
+
 PNP4Nagios
 ~~~~~~~~~~
 
-Veamos el ejemplo de la temperatura. El chequeo lo hemos definido como::
+Veamos el ejemplo de la gráfica de la temperatura. El chequeo lo hemos definido como::
 
     define service{
     	use 			generic-service
@@ -282,14 +341,27 @@ Veamos el ejemplo de la temperatura. El chequeo lo hemos definido como::
     	service_description 	Temperature #1
     	check_command 		check_enviromux!public!temperature1!30!38
 
-Cada vez que Nagios ejecuta un comando (en este caso ``check_enviromux``) busca el template correspondiente con el nombre ``check_enviromux.php`` en este caso. Si no lo encuentra usa por defecto el template ``default.php``. Los templates se encuentran en ``share/templates.dist`` los incluidos con PNP4Nagios y en ``share/templates`` los creados por nosotros y que no se deben actualizar al actualizar PNP4Nagios.
+Cada vez que Nagios ejecuta un comando (eg. ``check_enviromux``) busca el template correspondiente al nombre del comando +.php (eg. ``check_enviromux.php``)y si no lo encuentra usa por defecto el template ``default.php``. Los templates se encuentran por un lado en (OMD) ``~/share/pnp4nagios/htdocs/templates.dist/`` los incluidos con PNP4Nagios por defecto y por otro en (OMD) ``~/etc/pnp4nagios/templates/`` los creados por nosotros y que no se deben actualizar al actualizar PNP4Nagios (ver la `sección de templates`_ en la web de PNP3Nagios).
 
-El problema en este caso es que tenemos varios checks que utilizan el mismo comando, ``check_enviromux``. Lo que se hace en estos casos es un custom template. Para ello en el archivo de configuración ``etc/check_commands/check_enviromux.cfg`` se le dice que en caso en que llame al comando, debe utilizar para buscar el template por ejempl el segundo argumento de la llamada (en este caso buscaría pues el template ``temperature1.php``, pero se pueden hacer combinaciones tipo ``check_enviromux_template1.php`` y cosas así). Esto está muy bien explicado en `este blog`_ y en la documentación oficial de PNP4Nagios, en la sección de `custom templates`_.
+.. _`sección de templates`: http://docs.pnp4nagios.org/pnp-0.6/tpl
+
+El problema es que en nuestro caso tenemos varios checks que utilizan el mismo comando, ``check_enviromux``, con diferentes parámetros para los diferentes checks: ``temperature1, water, ...``. Para solventar esto se utiliza lo que se llama un custom template. Para ello en el archivo de configuración al efecto (OMD) ``etc/pnp4nagios/check_commands/check_enviromux.cfg`` se le dice aPNP4Nagios que en caso en que nagios llame al comando ``check_enviromux``, debe buscar el template **no** ``check_enviromux.php``, sino por ejemplo el que correspondería a uno con el nombre del segundo argumento de la llamada (en este caso buscaría pues el template ``temperature1.php``. Se pueden definir diferentes combinaciones de argumentos, o del comando + argumentos, del tipo ``check_enviromux_template1.php`` y cosas así. Esto está muy bien explicado en `este blog`_ y en la documentación oficial de PNP4Nagios, en la sección de `custom templates`_.
 
 .. _`este blog`: http://askaralikhan.blogspot.com/2010/01/creating-custom-template-in-pnp4nagios.html
 .. _`custom templates`: http://docs.pnp4nagios.org/pnp-0.6/tpl_custom
 
-En realidad lo que busca PNP4Nagios al ejecutar un comando que devuelve perfdata es un fichero ``perfdata/hostname/check_name.xml``. Este fichero lo genera parece que nagio automáticamente y en el está indicado qué template php debe utilizar en la sección ``<TEMPLATE> ... </TEMPLATE>``. En él podemos comprobar que el tema esté bien configurado. En el caso de *OMD* estos ficheros están en ``~/var/pnp4nagios/perfdata``. **Los datos rdd** también se encuentran en esa ruta.
+En realidad lo que busca PNP4Nagios al ejecutar un comando que devuelve perfdata es un fichero ``~/var/pnp4nagios/perfdata/HOST/CHECK.xml`` que es generado por nagios ¿o PNP4Nagios? automáticamente al encontrar perfdata y en el está indicado, entre otras cosas, qué template php debe utilizar en la sección ``<TEMPLATE> ... </TEMPLATE>``. En él podemos comprobar que todo lo explicado esté bien configurado; que lea el template adecuado, etc. En el caso de OMD estos ficheros están en ``~/var/pnp4nagios/perfdata``. **Los datos rdd** también se encuentran en esa ruta.
+
+
+Resumen de ficheros de configuración
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Así pues resumiendo lo expuesto encima hemos creado los ficheros::
+
+    ~/etc/nagios/conf.d/inigo/enviromux.cfg
+    ~/etc/pnp4nagios/check_commands/check_enviromux_mini.cfg
+    ~/etc/pnp4nagios/templates/{}
+
 
 check_mk checks
 ===============
