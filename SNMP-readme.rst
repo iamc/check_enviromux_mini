@@ -278,57 +278,68 @@ Realizamos toda la configuración en un único archivo a colocar en
 ``~/etc/nagios/conf.d/inigo/``. Aunque no lo sea usaremos la plantilla
 de ``linux-server`` para el host y de  ``generic-service`` para el servicio.
 
-``enviromux.cfg``::
+Creamos también un hostgroup ``Environment Sensors`` para que aparezca en la vista de resumen de los hostgroups.
 
-    ;Enviromux-1 in CPD-1 
-    define host{
-        ;use 		generic-host
-        use 		linux-server
-        host-alias 	Enviromux-TEST
-        alias 		Enviromux-TEST-1 CPD-1
-        address 	10.0.0.49
-    }
+.. warning:
 
-    define command{
-        command_name 	check_enviromux
-        command_line 	$USER1$/check_enviromux $HOSTADDRESS$ -C $ARG1$ -s $ARG2$ -w $ARG3$ -c $ARG4$
-    }
+        No olvidar usar también la plantilla ``srv-pnp`` en los servicios que queremos que aparezcan con gráficos de PNP4Nagios.
 
-    define service{
-        use 			generic-service
-        host_name 		Enviromux-TEST
-        service_description 	Temperature #1
-        check_command 		check_enviromux!public!temperature1!30!38
-    }
+Finalmente nos queda ``enviromux.cfg``::
 
-    define service{
-        use 			generic-service
-        host_name 		Enviromux-TEST
-        service_description 	Humidity #1
-        check_command 		check_enviromux!public!humidity1!70!80
-    }
+        ; Enviromux-1 in CPD-1 
+        define host{
+                ;use 		generic-host
+                use 		linux-server
+                host_name       Enviromux-TEST
+                alias 		Enviromux-TEST-1 CPD-1
+                address 	10.0.0.49
+        }
 
-    define service{
-        use 			generic-service
-        host_name 		Enviromux-TEST
-        service_description 	Water Sensor
-        check_command 		check_enviromux!public!water!1!1
-    }
+        define hostgroup{
+                hostgroup_name	Environment-sensors
+                alias 		Environment Sensors
+                members 	Enviromux-TEST
+        }
 
-    define service{
-        use 			generic-service
-        host_name 		Enviromux-TEST
-        service_description 	Contact #1
-        check_command 		check_enviromux!public!contact1!1!1
-    }
+        define command{
+                command_name 	check_enviromux_mini
+                command_line 	$USER2$/check_enviromux_mini $HOSTADDRESS$ -C $ARG1$ -s $ARG2$ -w $ARG3$ -c $ARG4$
+        }
 
-    define service{
-        use 			generic-service
-        host_name 		Enviromux-TEST
-        service_description 	Contact #2
-        check_command 		check_enviromux!public!contact2!1!1
-    }
+        define service{
+                use 			generic-service,srv-pnp
+                host_name 		Enviromux-TEST
+                service_description 	Temperature-1
+                check_command 		check_enviromux_mini!public!temperature1!30!38
+        }
 
+        define service{
+                use 			generic-service,srv-pnp
+                host_name 		Enviromux-TEST
+                service_description 	Humidity-1
+                check_command 		check_enviromux_mini!public!humidity1!70!80
+        }
+
+        define service{
+                use 			generic-service
+                host_name 		Enviromux-TEST
+                service_description 	Water Sensor
+                check_command 		check_enviromux_mini!public!water!1!1
+        }
+
+        define service{
+                use 			generic-service
+                host_name 		Enviromux-TEST
+                service_description 	Contact-1
+                check_command 		check_enviromux_mini!public!contact1!0!0
+        }
+
+        define service{
+                use 			generic-service
+                host_name 		Enviromux-TEST
+                service_description 	Contact #2
+                check_command 		check_enviromux_mini!public!contact2!1!1
+        }
 
 PNP4Nagios
 ~~~~~~~~~~
@@ -358,7 +369,11 @@ Resumen de ficheros de configuración
 
 Así pues resumiendo lo expuesto encima hemos creado los ficheros::
 
+    ~/lib/nagios/plugins/check_enviromux_mini
     ~/etc/nagios/conf.d/inigo/enviromux.cfg
+
+De momento no lo hacemos pero si nos intersa modificar la gráfica que general el template ``default.php``::
+
     ~/etc/pnp4nagios/check_commands/check_enviromux_mini.cfg
     ~/etc/pnp4nagios/templates/{}
 
