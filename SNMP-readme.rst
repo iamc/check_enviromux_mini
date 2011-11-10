@@ -372,10 +372,11 @@ Así pues resumiendo lo expuesto encima hemos creado los ficheros::
     ~/lib/nagios/plugins/check_enviromux_mini
     ~/etc/nagios/conf.d/inigo/enviromux.cfg
 
-De momento no lo hacemos pero si nos intersa modificar la gráfica que general el template ``default.php``::
+Para modificar la gráfica que general el template ``default.php`` nos basamos en dos que tiene check_mk por defecto (en ``~/share/check_mk/pnp-templates/`` ) para un sensor de humedad/temperatura, concretamente ``check_mk-akcp_sensor_humidity.php`` y ``check_mk-akcp_sensor_temp.php`` ::
 
     ~/etc/pnp4nagios/check_commands/check_enviromux_mini.cfg
-    ~/etc/pnp4nagios/templates/{}
+    ~/etc/pnp4nagios/templates/check_enviromux_mini_temperature1.php
+    ~/etc/pnp4nagios/templates/check_enviromux_mini_humidity1.php
 
 
 check_mk checks
