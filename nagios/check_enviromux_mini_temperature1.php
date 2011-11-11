@@ -29,12 +29,12 @@
 # | Michael Nieporte <Michael.Nieporte@uk-essen.de>                  |
 # +------------------------------------------------------------------+
 
-$opt[1] = "--vertical-label \"Value (C)\"  -l 0 -u 45 --title \"$servicedesc\" ";
+$opt[1] = "--vertical-label \"Celsius\"  -l 0 -u 45 --title \"$servicedesc\" ";
 
 $def[1] = "DEF:var1=$RRDFILE[1]:$DS[1]:MAX ";
-$def[1] .= "AREA:var1#2080ff:\"Temperature\:\" ";
+#$def[1] .= "AREA:var1#2080ff:\"Temperature\:\" ";
+$def[1] .= "LINE2:var1#000080:\"\" ";
 $def[1] .= "GPRINT:var1:LAST:\"%2.0lfC\" ";
-$def[1] .= "LINE1:var1#000080:\"\" ";
 $def[1] .= "GPRINT:var1:MAX:\"(Max\: %2.0lfC,\" ";
 $def[1] .= "GPRINT:var1:AVERAGE:\"Avg\: %2.0lfC)\" ";
 $def[1] .= "HRULE:$WARN[1]#FFFF00:\"Warning\: $WARN[1]C\" ";
