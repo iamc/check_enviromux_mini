@@ -95,7 +95,15 @@ def check_options(options, args, parser):
                      "querying all sensors simultaneously, default values "
                      "are used.")
 
-    # clasify sensor and check for contact sensors correct w/c options
+    # clasify sensor and check for contact sensors correct warning/critical
+    #  options
+    # TODO: Check/allow for variables with no values (eg: ... -w -c) to
+    #        generalice Nagios enviromux_mini specific check calls. Now in
+    #        nagios you *have to* give warning *and* critical levels in the
+    #        specific sensor checks, given how the general
+    #        check_enviromux_mini command is defined. This would allow for
+    #        default levels check. See: 
+    #        http://stackoverflow.com/questions/1229146/parsing-empty-options-in-python
     if "water" in options.sensor or "contact" in options.sensor:
         if options.warning != None and options.warning not in [0, 1]:
             parser.error("For contact type sensors warning/critical should be "
