@@ -1,10 +1,13 @@
-Enviromux-mini nagios plugin
-============================
+check_enviromux_mini - Enviromux-mini nagios plugin
+===================================================
+
+Nagios check for ENVIROMUX MINI server room environment monitoring system.
 
 Contact
   ~ [inigo\_aldazabal@ehu.es][]
 
 NAGIOS check for [enviromux-mini][] sensor using SNMP.
+
 
 Files description
 -----------------
